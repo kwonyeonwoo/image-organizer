@@ -275,6 +275,49 @@ ul {
 }
 
 /* --- Gallery & Drop Zone --- */
+.gallery-toolbar {
+  display: flex;
+  justify-content: flex-end;
+  margin-bottom: 1rem;
+  min-height: 48px;
+}
+
+.selection-actions {
+  display: flex;
+  align-items: center;
+  gap: 1rem;
+  background-color: var(--panel-bg);
+  padding: 0.5rem 1rem;
+  border-radius: 8px;
+  border: 1px solid var(--border-color);
+  animation: fadeIn 0.2s ease;
+}
+
+@keyframes fadeIn {
+  from { opacity: 0; transform: translateY(-5px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+
+.selection-count {
+  font-weight: bold;
+  color: var(--point-color);
+}
+
+.btn-danger {
+  background-color: #ff6b6b;
+  color: white;
+}
+
+.btn-danger:hover:not(:disabled) {
+  background-color: #e03131;
+}
+
+.btn-danger:disabled {
+  background-color: var(--border-color);
+  color: var(--text-secondary);
+  cursor: not-allowed;
+}
+
 .gallery-container {
   flex: 1;
   position: relative;
@@ -338,13 +381,57 @@ ul {
   aspect-ratio: 1;
   border: 1px solid var(--border-color);
   cursor: pointer;
-  transition: transform 0.2s ease;
+  transition: transform 0.2s ease, border-color 0.2s ease;
 }
 
 .image-card:hover {
   transform: translateY(-4px) scale(1.02);
   border-color: var(--point-color);
   box-shadow: 0 4px 20px rgba(56, 189, 248, 0.2);
+}
+
+.gallery-container.selection-mode .image-card:hover {
+  transform: none; /* 선택 모드에서는 튀어오르지 않게 */
+  box-shadow: none;
+}
+
+.image-card.selected {
+  border: 3px solid var(--point-color);
+  transform: scale(0.96);
+}
+
+.image-card.selected:hover {
+  transform: scale(0.96);
+}
+
+.select-overlay {
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background-color: rgba(0, 0, 0, 0.3);
+  display: flex;
+  justify-content: center;
+  align-items: center;
+}
+
+.image-card.selected .select-overlay {
+  background-color: rgba(56, 189, 248, 0.2);
+}
+
+.check-mark {
+  background-color: var(--point-color);
+  color: #000;
+  width: 40px;
+  height: 40px;
+  border-radius: 50%;
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  font-size: 1.5rem;
+  font-weight: bold;
+  box-shadow: 0 4px 10px rgba(0, 0, 0, 0.5);
 }
 
 .image-card img {

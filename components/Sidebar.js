@@ -68,57 +68,47 @@ export default function Sidebar({ user, selectedGroupId, setSelectedGroupId }) {
     }
   };
 
-  // 폴더 삭제 핸들러 (연쇄 파괴 포함)
+  // 폴더 삭제 핸들러 (연쇄 파괴 포함 - 확인창 즉시 패스)
   const handleDeleteGroup = async (e, groupId, groupName) => {
     e.stopPropagation(); // 부모 아이템 클릭 방지
-    const confirmDelete = window.confirm(`정말로 '${groupName}' 폴더를 삭제할까요?\n이 폴더 안의 모든 사진도 덩달아 영구 삭제됩니다.`);
     
-    if (confirmDelete) {
-      try {
-        // 1. 해당 폴더 안의 이미지들(DB 기록) 모두 가져와서 파기
-        const q = query(collection(db, "images"), where("groupId", "==", groupId));
-        const imageSnapshots = await getDocs(q);
-        
-        // 원본 파일을 지우기 위해 추출 함수
-        const getPublicIdFromUrl = (url) => {
-          const parts = url.split('/upload/');
-          if (parts.length < 2) return null;
-          const pathPart = parts[1].split('/').slice(1).join('/'); // remove 'v1234567/' part
-          return pathPart.substring(0, pathPart.lastIndexOf('.'));
-        };
+    try {
+      // 1. 해당 폴더 안의 이미지들(DB 기록) 모두 가져와서 파기
+      const q = query(collection(db, "images"), where("groupId", "==", groupId));
+      const imageSnapshots = await getDocs(q);
+      
+      const getPublicIdFromUrl = (url) => {
+        const parts = url.split('/upload/');
+        if (parts.length < 2) return null;
+        const pathPart = parts[1].split('/').slice(1).join('/'); 
+        return pathPart.substring(0, pathPart.lastIndexOf('.'));
+      };
 
-        // 이미지 하나하나 DB 지우면서 Cloudinary 원본도 지우기 API 쏘기
-        const deletePromises = imageSnapshots.docs.map(async (imgDoc) => {
-          const imgData = imgDoc.data();
-          
-          // API에 요청보내서 원본삭제
-          const publicId = getPublicIdFromUrl(imgData.url);
-          if (publicId) {
-            // 실패하더라도 넘어가도록 catch
-            fetch("/api/delete-image", {
-              method: "POST",
-              headers: { "Content-Type": "application/json" },
-              body: JSON.stringify({ public_id: publicId })
-            }).catch(console.error);
-          }
-
-          // DB 문서 삭제
-          return deleteDoc(doc(db, "images", imgDoc.id));
-        });
-
-        await Promise.all(deletePromises);
-
-        // 2. 텅 빈 폴더 최종 삭제
-        await deleteDoc(doc(db, "groups", groupId));
-
-        // 3. 삭제된 폴더를 현재 보고 있었다면 선택 해제
-        if (selectedGroupId === groupId) {
-          setSelectedGroupId(null);
+      const deletePromises = imageSnapshots.docs.map(async (imgDoc) => {
+        const imgData = imgDoc.data();
+        const publicId = getPublicIdFromUrl(imgData.url);
+        if (publicId) {
+          fetch("/api/delete-image", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ public_id: publicId })
+          }).catch(console.error);
         }
-      } catch (err) {
-        console.error("삭제 에러:", err);
-        alert("폴더 삭제에 실패했습니다.");
+        return deleteDoc(doc(db, "images", imgDoc.id));
+      });
+
+      await Promise.all(deletePromises);
+
+      // 2. 텅 빈 폴더 최종 삭제
+      await deleteDoc(doc(db, "groups", groupId));
+
+      if (selectedGroupId === groupId) {
+        setSelectedGroupId(null);
       }
+    } catch (err) {
+      console.error("삭제 에러:", err);
+      // alert는 실패시에만 남깁니다
+      alert("폴더 삭제에 실패했습니다.");
     }
   };
 
