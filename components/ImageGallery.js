@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useEffect } from "react";
-import { collection, addDoc, query, where, onSnapshot, serverTimestamp } from "firebase/firestore";
+import { collection, addDoc, query, where, onSnapshot, serverTimestamp, doc, deleteDoc } from "firebase/firestore";
 import { db } from "../lib/firebase";
 import ImageViewer from "./ImageViewer";
 
@@ -67,6 +67,42 @@ export default function ImageGallery({ user, selectedGroupId }) {
     } catch (error) {
       console.error("업로드 에러:", error);
       alert("이미지 업로드에 실패했습니다.");
+    }
+  };
+
+  const handleDeleteImage = async (imageId, imageUrl) => {
+    const confirmDelete = window.confirm("이 사진을 정말로 삭제할까요?\n(영구 삭제됩니다)");
+    if (!confirmDelete) return;
+
+    try {
+      // 1. Cloudinary 서버 원본 지우기 (API 호출)
+      const getPublicIdFromUrl = (url) => {
+        const parts = url.split('/upload/');
+        if (parts.length < 2) return null;
+        const pathPart = parts[1].split('/').slice(1).join('/'); 
+        return pathPart.substring(0, pathPart.lastIndexOf('.'));
+      };
+
+      const publicId = getPublicIdFromUrl(imageUrl);
+      if (publicId) {
+        await fetch("/api/delete-image", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ public_id: publicId })
+        });
+      }
+
+      // 2. 파이어베이스 DB 지우기
+      await deleteDoc(doc(db, "images", imageId));
+
+      // 뷰어 인덱스 처리 
+      // 만약 지워진 사진이 마지막 사진이면 꺼지기, 중간이면 그대로 두기
+      if (viewerIndex >= images.length - 1) {
+        setViewerIndex(null); 
+      }
+    } catch (err) {
+      console.error("이미지 삭제 실패:", err);
+      alert("이미지 삭제에 실패했습니다.");
     }
   };
 
@@ -159,6 +195,7 @@ export default function ImageGallery({ user, selectedGroupId }) {
         currentIndex={viewerIndex}
         onClose={closeViewer}
         onNavigate={handleNavigate}
+        onDelete={handleDeleteImage}
       />
     </>
   );

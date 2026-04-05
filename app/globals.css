@@ -222,7 +222,16 @@ ul {
   transition: all 0.2s ease;
   display: flex;
   align-items: center;
+  justify-content: space-between;
+}
+
+.sidebar-item-content {
+  display: flex;
+  align-items: center;
   gap: 0.5rem;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
 .sidebar-item:hover {
@@ -233,6 +242,30 @@ ul {
   background-color: var(--point-color);
   color: #000;
   font-weight: 600;
+}
+
+.sidebar-item-actions {
+  display: flex;
+  gap: 0.25rem;
+  opacity: 0;
+  transition: opacity 0.2s ease;
+}
+
+.sidebar-item:hover .sidebar-item-actions {
+  opacity: 1;
+}
+
+.sidebar-item-actions button {
+  background: none;
+  border: none;
+  cursor: pointer;
+  font-size: 1rem;
+  padding: 0.2rem;
+  border-radius: 4px;
+}
+
+.sidebar-item-actions button:hover {
+  background-color: rgba(255, 255, 255, 0.2);
 }
 
 .sidebar-footer {
@@ -352,6 +385,26 @@ ul {
 
 .viewer-close:hover {
   opacity: 1;
+}
+
+.viewer-delete {
+  position: absolute;
+  top: 2rem;
+  left: 2rem;
+  background-color: rgba(255, 107, 107, 0.2);
+  border: 1px solid #ff6b6b;
+  color: #ff6b6b;
+  font-size: 1rem;
+  padding: 0.5rem 1rem;
+  border-radius: 8px;
+  cursor: pointer;
+  z-index: 1010;
+  transition: all 0.2s;
+}
+
+.viewer-delete:hover {
+  background-color: #ff6b6b;
+  color: white;
 }
 
 .viewer-content {
