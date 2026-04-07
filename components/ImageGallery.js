@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useEffect } from "react";
-import { collection, addDoc, query, where, onSnapshot, serverTimestamp, doc, deleteDoc } from "firebase/firestore";
+import { collection, addDoc, query, where, onSnapshot, serverTimestamp, doc, updateDoc, deleteDoc } from "firebase/firestore";
 import { db } from "../lib/firebase";
 import ImageViewer from "./ImageViewer";
 
@@ -14,6 +14,8 @@ export default function ImageGallery({ user, selectedGroupId }) {
   const [viewerIndex, setViewerIndex] = useState(null);
   const [isSelectionMode, setIsSelectionMode] = useState(false);
   const [selectedImageIds, setSelectedImageIds] = useState(new Set());
+
+  const [draggingImageId, setDraggingImageId] = useState(null);
 
   // 현재 선택된 그룹의 이미지들 최신화
   useEffect(() => {
@@ -32,7 +34,12 @@ export default function ImageGallery({ user, selectedGroupId }) {
         id: doc.id,
         ...doc.data(),
       }));
-      imageData.sort((a, b) => (b.createdAt?.toMillis() || 0) - (a.createdAt?.toMillis() || 0));
+      // orderIndex가 있으면 우선 정렬, 없으면 createdAt으로 정렬
+      imageData.sort((a, b) => {
+        const orderA = a.orderIndex ?? (a.createdAt?.toMillis() || 0);
+        const orderB = b.orderIndex ?? (b.createdAt?.toMillis() || 0);
+        return orderB - orderA;
+      });
       setImages(imageData);
     });
 
@@ -62,6 +69,7 @@ export default function ImageGallery({ user, selectedGroupId }) {
           userId: user.uid,
           groupId: selectedGroupId,
           createdAt: serverTimestamp(),
+          orderIndex: Date.now(), // 기본 순서값으로 현재 시간 사용
         });
       }
     } catch (error) {
@@ -135,6 +143,61 @@ export default function ImageGallery({ user, selectedGroupId }) {
     }
   };
 
+  const handleDragStart = (e, imageId) => {
+    if (isSelectionMode) return;
+    setDraggingImageId(imageId);
+    e.dataTransfer.setData("imageId", imageId);
+    e.dataTransfer.effectAllowed = "move";
+  };
+
+  const handleDragEnd = () => {
+    setDraggingImageId(null);
+  };
+
+  const handleImageDragOver = (e) => {
+    e.preventDefault();
+    e.dataTransfer.dropEffect = "move";
+  };
+
+  const handleImageDrop = async (e, targetImageId) => {
+    e.preventDefault();
+    const draggedId = e.dataTransfer.getData("imageId");
+    
+    // 파일 업로드 드롭과 겹치지 않게 체크
+    if (!draggedId || draggedId === targetImageId) return;
+
+    const draggedIdx = images.findIndex(img => img.id === draggedId);
+    const targetIdx = images.findIndex(img => img.id === targetImageId);
+
+    if (draggedIdx === -1 || targetIdx === -1) return;
+
+    // 새로운 orderIndex 계산 (사이에 끼워넣기)
+    let newOrderIndex;
+    const sortedImages = [...images];
+    
+    // 타겟 위치의 앞/뒤 이미지들의 orderIndex를 참조하여 중간값 설정
+    // 여기서는 간단하게 타겟 이미지의 orderIndex 근처로 설정
+    const targetOrder = images[targetIdx].orderIndex ?? (images[targetIdx].createdAt?.toMillis() || 0);
+    
+    if (draggedIdx < targetIdx) {
+      // 뒤로 보내기
+      const nextOrder = images[targetIdx + 1]?.orderIndex ?? (images[targetIdx + 1]?.createdAt?.toMillis() || 0);
+      newOrderIndex = nextOrder ? (targetOrder + nextOrder) / 2 : targetOrder - 1000;
+    } else {
+      // 앞으로 보내기
+      const prevOrder = images[targetIdx - 1]?.orderIndex ?? (images[targetIdx - 1]?.createdAt?.toMillis() || 0);
+      newOrderIndex = prevOrder ? (targetOrder + prevOrder) / 2 : targetOrder + 1000;
+    }
+
+    try {
+      await updateDoc(doc(db, "images", draggedId), {
+        orderIndex: newOrderIndex
+      });
+    } catch (err) {
+      console.error("순서 변경 실패:", err);
+    }
+  };
+
   const handleImageClick = (index, imageId) => {
     if (isSelectionMode) {
       // 선택 상태 토글
@@ -152,9 +215,12 @@ export default function ImageGallery({ user, selectedGroupId }) {
   };
 
   const handleDragOver = (e) => {
-    e.preventDefault();
-    if (!selectedGroupId) return;
-    setIsDragging(true);
+    // 갤러리 자체 드래그 오버 (파일 업로드용)
+    if (e.dataTransfer.types.includes("Files")) {
+      e.preventDefault();
+      if (!selectedGroupId) return;
+      setIsDragging(true);
+    }
   };
   const handleDragLeave = (e) => {
     e.preventDefault();
@@ -218,11 +284,17 @@ export default function ImageGallery({ user, selectedGroupId }) {
           ) : (
             images.map((img, index) => {
               const isSelected = selectedImageIds.has(img.id);
+              const isDraggingNow = draggingImageId === img.id;
               return (
                 <div 
                   key={img.id} 
-                  className={`image-card ${isSelected ? "selected" : ""}`} 
+                  className={`image-card ${isSelected ? "selected" : ""} ${isDraggingNow ? "dragging-now" : ""}`} 
                   onClick={() => handleImageClick(index, img.id)}
+                  draggable={!isSelectionMode}
+                  onDragStart={(e) => handleDragStart(e, img.id)}
+                  onDragEnd={handleDragEnd}
+                  onDragOver={handleImageDragOver}
+                  onDrop={(e) => handleImageDrop(e, img.id)}
                 >
                   {/* eslint-disable-next-line @next/next/no-img-element */}
                   <img src={img.url} alt="Uploaded file" loading="lazy" />

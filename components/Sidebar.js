@@ -112,6 +112,35 @@ export default function Sidebar({ user, selectedGroupId, setSelectedGroupId }) {
     }
   };
 
+  const [dragOverGroupId, setDragOverGroupId] = useState(null);
+
+  const handleDragOverGroup = (e, groupId) => {
+    e.preventDefault();
+    if (groupId === selectedGroupId) return;
+    setDragOverGroupId(groupId);
+  };
+
+  const handleDragLeaveGroup = () => {
+    setDragOverGroupId(null);
+  };
+
+  const handleDropToGroup = async (e, targetGroupId) => {
+    e.preventDefault();
+    setDragOverGroupId(null);
+
+    const imageId = e.dataTransfer.getData("imageId");
+    if (!imageId || targetGroupId === selectedGroupId) return;
+
+    try {
+      await updateDoc(doc(db, "images", imageId), {
+        groupId: targetGroupId,
+        orderIndex: Date.now() // 이동 시 해당 그룹의 상단 근처로 배치(기본값)
+      });
+    } catch (err) {
+      console.error("그룹 이동 실패:", err);
+    }
+  };
+
   return (
     <aside className="sidebar">
       <div className="sidebar-header">
@@ -125,8 +154,11 @@ export default function Sidebar({ user, selectedGroupId, setSelectedGroupId }) {
           groups.map((group) => (
             <div
               key={group.id}
-              className={`sidebar-item ${selectedGroupId === group.id ? "active" : ""}`}
+              className={`sidebar-item ${selectedGroupId === group.id ? "active" : ""} ${dragOverGroupId === group.id ? "drag-over" : ""}`}
               onClick={() => setSelectedGroupId(group.id)}
+              onDragOver={(e) => handleDragOverGroup(e, group.id)}
+              onDragLeave={handleDragLeaveGroup}
+              onDrop={(e) => handleDropToGroup(e, group.id)}
             >
               <div className="sidebar-item-content">
                 <span>📁 {group.name}</span>
