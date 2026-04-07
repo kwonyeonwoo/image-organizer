@@ -19,7 +19,11 @@ export default function Sidebar({ user, selectedGroupId, setSelectedGroupId }) {
         id: doc.id,
         ...doc.data(),
       }));
-      groupData.sort((a, b) => (b.createdAt?.toMillis() || 0) - (a.createdAt?.toMillis() || 0));
+      groupData.sort((a, b) => {
+        const orderA = a.orderIndex ?? (a.createdAt?.toMillis() || 0);
+        const orderB = b.orderIndex ?? (b.createdAt?.toMillis() || 0);
+        return orderB - orderA;
+      });
       
       setGroups(groupData);
       
@@ -41,6 +45,7 @@ export default function Sidebar({ user, selectedGroupId, setSelectedGroupId }) {
         name: newGroupName.trim(),
         userId: user.uid,
         createdAt: serverTimestamp(),
+        orderIndex: Date.now(),
       });
       setNewGroupName("");
       setSelectedGroupId(docRef.id);
@@ -113,6 +118,17 @@ export default function Sidebar({ user, selectedGroupId, setSelectedGroupId }) {
   };
 
   const [dragOverGroupId, setDragOverGroupId] = useState(null);
+  const [draggingGroupId, setDraggingGroupId] = useState(null);
+
+  const handleDragStartGroupItem = (e, groupId) => {
+    setDraggingGroupId(groupId);
+    e.dataTransfer.setData("draggedGroupId", groupId);
+    e.dataTransfer.effectAllowed = "move";
+  };
+
+  const handleDragEndGroupItem = () => {
+    setDraggingGroupId(null);
+  };
 
   const handleDragOverGroup = (e, groupId) => {
     e.preventDefault();
@@ -129,15 +145,47 @@ export default function Sidebar({ user, selectedGroupId, setSelectedGroupId }) {
     setDragOverGroupId(null);
 
     const imageId = e.dataTransfer.getData("imageId");
-    if (!imageId || targetGroupId === selectedGroupId) return;
+    const draggedGroupId = e.dataTransfer.getData("draggedGroupId");
 
-    try {
-      await updateDoc(doc(db, "images", imageId), {
-        groupId: targetGroupId,
-        orderIndex: Date.now() // 이동 시 해당 그룹의 상단 근처로 배치(기본값)
-      });
-    } catch (err) {
-      console.error("그룹 이동 실패:", err);
+    if (imageId) {
+      if (targetGroupId === selectedGroupId) return;
+      try {
+        await updateDoc(doc(db, "images", imageId), {
+          groupId: targetGroupId,
+          orderIndex: Date.now() // 이동 시 해당 그룹의 상단 근처로 배치(기본값)
+        });
+      } catch (err) {
+        console.error("그룹 이동 실패:", err);
+      }
+      return;
+    }
+
+    if (draggedGroupId && draggedGroupId !== targetGroupId) {
+      const draggedIdx = groups.findIndex(g => g.id === draggedGroupId);
+      const targetIdx = groups.findIndex(g => g.id === targetGroupId);
+
+      if (draggedIdx === -1 || targetIdx === -1) return;
+
+      let newOrderIndex;
+      const targetOrder = groups[targetIdx].orderIndex ?? (groups[targetIdx].createdAt?.toMillis() || 0);
+
+      if (draggedIdx < targetIdx) {
+        // 뒤로 보내기
+        const nextOrder = groups[targetIdx + 1]?.orderIndex ?? (groups[targetIdx + 1]?.createdAt?.toMillis() || 0);
+        newOrderIndex = nextOrder ? (targetOrder + nextOrder) / 2 : targetOrder - 1000;
+      } else {
+        // 앞으로 보내기
+        const prevOrder = groups[targetIdx - 1]?.orderIndex ?? (groups[targetIdx - 1]?.createdAt?.toMillis() || 0);
+        newOrderIndex = prevOrder ? (targetOrder + prevOrder) / 2 : targetOrder + 1000;
+      }
+
+      try {
+        await updateDoc(doc(db, "groups", draggedGroupId), {
+          orderIndex: newOrderIndex
+        });
+      } catch (err) {
+        console.error("폴더 순서 변경 실패:", err);
+      }
     }
   };
 
@@ -154,7 +202,10 @@ export default function Sidebar({ user, selectedGroupId, setSelectedGroupId }) {
           groups.map((group) => (
             <div
               key={group.id}
-              className={`sidebar-item ${selectedGroupId === group.id ? "active" : ""} ${dragOverGroupId === group.id ? "drag-over" : ""}`}
+              draggable
+              onDragStart={(e) => handleDragStartGroupItem(e, group.id)}
+              onDragEnd={handleDragEndGroupItem}
+              className={`sidebar-item ${selectedGroupId === group.id ? "active" : ""} ${dragOverGroupId === group.id ? "drag-over" : ""} ${draggingGroupId === group.id ? "dragging-now" : ""}`}
               onClick={() => setSelectedGroupId(group.id)}
               onDragOver={(e) => handleDragOverGroup(e, group.id)}
               onDragLeave={handleDragLeaveGroup}
