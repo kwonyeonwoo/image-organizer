@@ -312,7 +312,7 @@ export default function ImageGallery({ user, selectedGroupId }) {
                   key={img.id} 
                   className={`image-card ${isSelected ? "selected" : ""} ${isDraggingNow ? "dragging-now" : ""}`} 
                   onClick={() => handleImageClick(index, img.id)}
-                  draggable={!isSelectionMode}
+                  draggable={true} // 항상 드래그 가능하게 변경하여 다중 드래그 지원
                   onDragStart={(e) => handleDragStart(e, img.id)}
                   onDragEnd={handleDragEnd}
                   onDragOver={handleImageDragOver}
