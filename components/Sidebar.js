@@ -145,14 +145,34 @@ export default function Sidebar({ user, selectedGroupId, setSelectedGroupId }) {
     setDragOverGroupId(null);
 
     const imageId = e.dataTransfer.getData("imageId");
+    const imageIdsJson = e.dataTransfer.getData("imageIds");
     const draggedGroupId = e.dataTransfer.getData("draggedGroupId");
 
+    // 다중 이미지 이동 처리
+    if (imageIdsJson) {
+      if (targetGroupId === selectedGroupId) return;
+      try {
+        const imageIds = JSON.parse(imageIdsJson);
+        const updatePromises = imageIds.map(id => 
+          updateDoc(doc(db, "images", id), {
+            groupId: targetGroupId,
+            orderIndex: Date.now()
+          })
+        );
+        await Promise.all(updatePromises);
+      } catch (err) {
+        console.error("다중 그룹 이동 실패:", err);
+      }
+      return;
+    }
+
+    // 단일 이미지 이동 처리
     if (imageId) {
       if (targetGroupId === selectedGroupId) return;
       try {
         await updateDoc(doc(db, "images", imageId), {
           groupId: targetGroupId,
-          orderIndex: Date.now() // 이동 시 해당 그룹의 상단 근처로 배치(기본값)
+          orderIndex: Date.now()
         });
       } catch (err) {
         console.error("그룹 이동 실패:", err);

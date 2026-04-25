@@ -144,10 +144,32 @@ export default function ImageGallery({ user, selectedGroupId }) {
   };
 
   const handleDragStart = (e, imageId) => {
-    if (isSelectionMode) return;
-    setDraggingImageId(imageId);
-    e.dataTransfer.setData("imageId", imageId);
-    e.dataTransfer.effectAllowed = "move";
+    // 선택 모드이고 현재 드래그하려는 이미지가 선택된 이미지 중 하나라면 다중 드래그
+    if (isSelectionMode && selectedImageIds.has(imageId)) {
+      setDraggingImageId(imageId);
+      const selectedIds = Array.from(selectedImageIds);
+      e.dataTransfer.setData("imageIds", JSON.stringify(selectedIds));
+      e.dataTransfer.effectAllowed = "move";
+      
+      // 드래그 고스트 이미지 커스텀 (선택 사항: 여러 장임을 표시)
+      const dragIcon = document.createElement("div");
+      dragIcon.style.padding = "10px";
+      dragIcon.style.background = "#3b82f6";
+      dragIcon.style.color = "white";
+      dragIcon.style.borderRadius = "8px";
+      dragIcon.style.fontWeight = "bold";
+      dragIcon.innerText = `${selectedIds.length}장의 이미지 이동`;
+      dragIcon.style.position = "absolute";
+      dragIcon.style.top = "-1000px";
+      document.body.appendChild(dragIcon);
+      e.dataTransfer.setDragImage(dragIcon, 0, 0);
+      setTimeout(() => document.body.removeChild(dragIcon), 0);
+    } else {
+      // 단일 드래그
+      setDraggingImageId(imageId);
+      e.dataTransfer.setData("imageId", imageId);
+      e.dataTransfer.effectAllowed = "move";
+    }
   };
 
   const handleDragEnd = () => {
